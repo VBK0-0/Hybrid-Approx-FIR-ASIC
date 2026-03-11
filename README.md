@@ -40,8 +40,34 @@ While approximate computing theoretically reduces area and power by minimizing l
 
 ### Design Hierarchy 
 
-The approximate compressors are built upon 4-way sorting networks. By selectively removing sorting elements, we trade mathematical precision for physical hardware efficiency.
+## 🎛️ Top-Level Architecture: 4-Tap FIR Filter
 
+While the core focus of this project is the approximate 4:2 compressors, they are practically implemented and evaluated within the context of a **4-Tap Direct-Form Finite Impulse Response (FIR) Filter**. 
+
+The FIR filter acts as the top-level testing ground for the approximate multipliers. It consists of three main stages:
+
+1. **Delay Line (Shift Registers):** The 8-bit input signal (`x_in`) is passed through a chain of three D-flip-flop delay registers (`x1`, `x2`, `x3`) on each positive clock edge.
+2. **Approximate Multiplier Array:** Four 8x8 multipliers operate in parallel. Each multiplier takes one delayed input signal and multiplies it by a fixed, positive stress-test coefficient (`h0`, `h1`, `h2`, `h3`). **This is where the Exact, 1-Error, or 2-Error compressor logic is instantiated.**
+3. **Accumulation (Adder Tree):** The 16-bit outputs from the four multipliers (`m0`, `m1`, `m2`, `m3`) are summed together to produce the final filtered output (`y_out`).
+
+```text
+       x_in ──┬────────►[ Z⁻¹ ]──┬────────►[ Z⁻¹ ]──┬────────►[ Z⁻¹ ]──┐
+              │                  │                  │                  │
+              ▼                  ▼                  ▼                  ▼
+            ( M0 )             ( M1 )             ( M2 )             ( M3 )  ◄── Approximate Multipliers
+              ▲                  ▲                  ▲                  ▲
+              │                  │                  │                  │
+              h0                 h1                 h2                 h3
+              │                  │                  │                  │
+              └────────┬─────────┴────────┬─────────┴────────┬─────────┘
+                       │                  │                  │
+                       ▼                  ▼                  ▼
+                     [ + ] ◄────────────[ + ] ◄────────────[ + ]  ◄── Adder Tree
+                       │
+                     y_out
+```
+The approximate compressors are built upon 4-way sorting networks. By selectively removing sorting elements, 
+we trade mathematical precision for physical hardware efficiency.
 ```text
 ┌─────────────────────────────────────────────────────────┐
 │                    INPUT SIGNALS                        │
@@ -123,11 +149,9 @@ assign Sum = (A & ~h1) | (~A & h1) | h2;
 
 ---
 
-## 📊 Results
+## 📊 6. Final ASIC Physical Synthesis Results (SkyWater 130nm)
 
-### 🧩 ASIC Post-Layout Physical Synthesis (SkyWater 130nm)
-
-Following the AOI optimization, the physical data established a distinct **Pareto optimization frontier** balancing Area, Speed, and Power. 
+Following the AOI standard-cell optimization, the physical data established a distinct **Pareto optimization frontier**. To accurately measure the efficiency trade-offs, the **Area-Delay Product (ADP)** and **Power-Delay Product (PDP)** were calculated.
 
 <div align="center">
 
@@ -137,15 +161,19 @@ Following the AOI optimization, the physical data established a distinct **Paret
 | **Silicon Area (μm²)** | 18,086 | **16,583** | 17,116 | **1-Error** |
 | **Critical Path (ns)** | 6.03 | 5.83 | **5.54** | **2-Error** |
 | **Dynamic Power (μW)**| 0.001573 | 0.001412 | **0.001286** | **2-Error** |
+| **ADP (μm²·ns)** | 109,058 | 96,678 | **94,822** | **2-Error** |
+| **PDP / Energy (fJ)** | 0.00948 | 0.00823 | **0.00712** | **2-Error** |
 
+*(Note: Dynamic power is calculated as `internal_power` + `switching_power`. PDP yields femtoJoules ($fJ$))*
 </div>
 
-> 🧠 **Engineering Conclusion:**  
-> The **1-error architecture** is the undisputed champion for strict **area reduction**. The physical footprint of one extra sorting element is smaller than the output routing penalty of the 2-error design. 
-> However, the **2-error architecture**, when mapped to AOI cells, provides the ultimate optimization for **execution speed and dynamic power**.
+### 🔑 Key Engineering Conclusions
 
----
+1. **Absolute Area vs. Architecture:** The **1-error architecture** is the undisputed champion for strict area reduction. The physical footprint of its one extra sorting element is actually smaller than the complex XOR output routing penalty of the 2-error design. 
+2. **Speed & Absolute Power:** The **2-error architecture**, when mapped to AOI cells, provides the ultimate optimization for execution speed (5.54 ns) and dynamic power (0.001286 μW).
+3. **Overall Efficiency (Figures of Merit):** While the 1-error design is physically smaller, the **2-error design wins both the ADP and PDP metrics**. This proves that the speed and power benefits of the 2-error architecture vastly outweigh its slight area penalty, making it the most energy-efficient and well-rounded hardware accelerator of the three.
 
+`![ASIC Layout](docs/asic_layout.png)`
 ### 🔋 FPGA Implementation Results
 
 Prior to ASIC synthesis, the multipliers were validated on an FPGA platform. Integrating the compressors into an 8x8 MAC unit demonstrated that for high-value computations, the controlled deviation of the approximate designs significantly reduces overall power consumption and LUT utilization compared to exact multiplication.
@@ -229,6 +257,12 @@ Navigate to the generated `runs/` directory and open the `.gds` files using KLay
 <summary><b>Q: Which compressor should I use for my project?</b></summary>
 
 **Answer**: If your primary constraint is **Silicon Area** (e.g., IoT edge endpoints), use the **1-Error** design. If your primary constraints are **Speed and Power** (e.g., high-throughput DSP pipelines), use the **2-Error** design optimized with AOI logic.
+</details>
+
+<details>
+<summary><b>Q: Why did you use a Direct Form FIR filter architecture instead of Transposed Form?</b></summary>
+
+**Answer**: Direct Form was intentionally chosen to isolate the metrics of the approximate multipliers. Transposed Form requires wider pipeline registers (to store the 16-bit accumulated sums), which would have artificially inflated the total silicon area with D-Flip-Flops and obscured the area savings of the approximate compressors. Furthermore, the unpipelined adder tree in the Direct Form architecture allowed us to accurately expose and measure the combinatorial delay penalties (the "XOR Trap") introduced by the 2-error approximation logic.
 </details>
 
 ---
