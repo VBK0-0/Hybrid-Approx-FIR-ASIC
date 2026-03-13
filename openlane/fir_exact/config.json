@@ -1,8 +1,0 @@
-{
-    "DESIGN_NAME": "FIR_Filter_4Tap",
-    "VERILOG_FILES": "dir::src/*.v",
-    "CLOCK_PORT": "clk",
-    "CLOCK_PERIOD": 15.0,
-    "FP_CORE_UTIL": 45,
-    "PL_TARGET_DENSITY": 0.50
-}
