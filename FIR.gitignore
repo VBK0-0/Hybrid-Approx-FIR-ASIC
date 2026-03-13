@@ -1,0 +1,9 @@
+runs/
+results/
+reports/
+*.log
+*.gds
+*.def
+*.spef
+*.spice
+build/
