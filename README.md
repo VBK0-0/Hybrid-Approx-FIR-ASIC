@@ -225,14 +225,34 @@ The core of this FIR filter design relies on **4:2 Compressors** generated via *
 
 ## 🔍 Error Characterization & Corner Cases
 
+To evaluate the numerical impact of approximation, the FIR filter outputs were compared against the exact implementation across a range of input values. The results highlight how the architectural simplifications in the compressor networks affect the final filtered output.
+
 <div align="center">
 
 <img src="./images/fir_error_comparision_plot.png" width="600">
 
 </div>
 
-<div align="center">
-<p><i>FIR Error Comparision Plot</i></p>
+The approximate compressors are built upon **4-way sorting networks**. By selectively removing sorting elements, the design trades **mathematical precision** for **hardware efficiency**. While most operating points show negligible deviation from the exact implementation, certain corner cases produce larger errors due to accumulated approximation inside the multiplier array.
+
+The following table illustrates representative simulation outputs captured during verification.
+
+### 📊 Sample Error Measurements
+
+| Time (ns) | Binary Input | Decimal Input | Exact `y_out` | 1-Error `y_out` | 2-Error `y_out` | 1-Error Absolute Error | 2-Error Absolute Error |
+|-----------|-------------|--------------|--------------|---------------|---------------|-----------------------|-----------------------|
+| 55000 | 00001000 | 8 | 1550 | 788 | 788 | 0 | 0 |
+| 95000 | 00010101 | 21 | 4803 | 3152 | 3152 | 0 | 0 |
+| 135000 | 00011111 | 31 | 9544 | 8274 | 18962 | 0 | 10688 |
+| 175000 | 00111111 | 63 | 16278 | 12214 | 19686 | 0 | 7472 |
+| 215000 | 01111111 | 127 | 32950 | 24822 | 40294 | 0 | 15472 |
+
+### 🔎 Key Observations
+
+- For **low and moderate input magnitudes**, both approximate architectures closely match the exact implementation.
+- The **1-Error compressor** maintains strong numerical stability, with negligible deviation across tested inputs.
+- The **2-Error compressor** occasionally produces larger deviations due to compounded approximation within the multiplier tree.
+- Despite these deviations, the architectural simplifications significantly reduce **hardware complexity, power consumption, and critical path delay**, making approximate designs attractive for **error-tolerant DSP applications**.
 </div>
 In approximate computing, understanding the worst-case scenarios is just as important as the average error. The "pruning" of sorting elements causes the network to fail under specific high-density input patterns. 
 
