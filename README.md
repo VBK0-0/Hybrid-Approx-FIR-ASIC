@@ -159,36 +159,48 @@ Prior to ASIC synthesis, the multipliers were validated on an FPGA platform. Int
 <div align="center">
 
 #### 🗺️ 1-Error & 2-Error Schematics
-<div align="left">
+<div align="center">
 
 <img src="./images/Compressor_1error.png" width="400">
-
-</div>
-
-<div align="right">
-
 <img src="./images/Compressor_2error.png" width="400">
 
 </div>
 
-
 *Architectural block diagrams illustrating the reduction of sorting elements.*
 ---
 
-![Multiplier_Architecture](./images/Approx_multiplier_dot_diagram.png)
-![Multiplier_Architecture](Approx_multiplier_decoded_dot_diagram.png)
+<div align="center">
+
+<img src="./images/Approx_multiplier_dot_diagram.png" width="400">
+
+</div>
+
+<div align="center">
+
+<img src="./images/Approx_multiplier_decoded_dot_diagram.png" width="400">
+
+</div>
 
 *Dot diagram and decoded dot diagrams for the approximate multipliers used in FIR Filter*
 ---
 
 #### 🧱 ASIC Physical Layout (GDSII)
-![ASIC Layout](./images/fir_exact_gds.png)
-![ASIC Layout](./images/fir_1error_gds.png)
-![ASIC Layout](./images/fir_2error_gds.png)
+<div align="center">
+
+<img src="./images/fir_exact_gds.png" width="400">
+<img src="./images/fir_1error_gds.png" width="400">
+<img src="./images/fir_2error_gds.png" width="400">
+
+</div>
 
 *SkyWater 130nm — 2D layout view showing complete routed standard cells and power delivery network.*
 ---
-![Comparision plot](./images/fir_error_comparision_plot.png)
+
+<div align="center">
+
+<img src="./images/fir_error_comparision_plot.png" width="600">
+
+</div>
 
 *FIR Error Comparision Plot*
 ---
