@@ -2,10 +2,6 @@
 
 # Hybrid-Approx-FIR-ASIC: RTL to GDSII
 
-</div>
-
-<div align="center">
-
 ![OpenLane](https://img.shields.io/badge/OpenLane%20-v1.0.0-blue?style=for-the-badge)
 ![VLSI](https://img.shields.io/badge/VLSI-System%20Design-blue?style=for-the-badge)
 ![Technology](https://img.shields.io/badge/Tech-SkyWater%20130nm-green?style=for-the-badge)
@@ -14,143 +10,113 @@
 
 *Hardware Implementation and VLSI Analysis of Approximate Compressors for FIR Filters*
 
-[Overview](#-overview) • [Architecture](#-architecture) • [Results](#-results) • [Getting Started](#-getting-started) • [Documentation](#-documentation)
-
----
+[Overview](#-overview) • [Architecture](#-architecture) • [Results](#-results) • [The Multi-Platform Perspective](#-the-multi-platform-perspective-why-the-2-error-matters) • [Getting Started](#-getting-started) 
 
 </div>
 
+---
+
 ## 🎯 Overview
 
-This project presents a **complete hardware implementation** of Approximate 4:2 Compressors based on sorting networks. Designed for Finite Impulse Response (FIR) filters and Multiplier-Accumulator (MAC) units, this repository explores the critical intersection between **architectural theory and physical silicon reality**. 
+This project presents a complete **RTL-to-GDSII hardware implementation** of Approximate 4:2 Compressors based on sorting networks. Designed for Finite Impulse Response (FIR) filters and Multiplier-Accumulator (MAC) units, this repository explores the critical intersection between **architectural theory and physical silicon reality**. 
 
-While approximate computing theoretically reduces area and power by minimizing logic gates, this project proves that physical hardware constraints—specifically CMOS routing overhead and complex gate penalties—can completely upend those theoretical models.
+While approximate computing theoretically reduces area and power by minimizing logical nodes, our physical synthesis analysis reveals a fascinating divergence between system-level accuracy and hardware-level efficiency. 
+
+We discovered a profound engineering trade-off:
+* **The Accuracy Champion:** The **2-Error architecture** provides 99% higher accuracy due to systematic error cancellation, but falls victim to physical CMOS standard-cell routing penalties (the "XOR Trap"). 
+* **The Hardware Champion:** The **1-Error architecture** is the undisputed hardware efficiency champion in SkyWater 130nm silicon, boasting the smallest area and power footprint, but suffers from compounding mathematical bias.
 
 ### ✨ Key Highlights
 
-- 🚀 **Dual-Domain Validation**: Proven on both FPGA (Utilization/Power) and ASIC architectures.
-- 🎨 **Open-Source Flow**: Complete RTL-to-GDSII implementation using SkyWater 130nm PDK and OpenLane.
-- 🔬 **The "XOR Trap" Discovery**: Identified and resolved a critical CMOS standard-cell bottleneck.
-- 📊 **Pareto Optimization**: Established a definitive trade-off frontier between Area, Speed, and Power.
-- ⚙️ **High-Speed Logic**: Utilized AOI (AND-OR-Invert) standard cell mapping to achieve a 5.54 ns critical path.
+* 🚀 **System-Level Accuracy Discovery:** Proven that 2-Error designs exhibit massive error-decorrelation in Sum-of-Product architectures, drastically outperforming 1-Error variants in signal integrity.
+* 🎨 **Open-Source Flow:** Complete physical implementation using the SkyWater 130nm open-source PDK and the OpenLane/OpenROAD toolchain.
+* 🔬 **The "XOR Trap" Discovery:** Identified and quantified a critical CMOS standard-cell bottleneck where *fewer* logical gates paradoxically result in a *larger* physical footprint.
+* 📊 **Multi-Platform Analysis:** Established why an architecture that fails in standard-cell ASICs can be the ultimate solution for FPGAs or Custom-Transistor layouts.
 
 ---
 
 ## 🏗 Architecture
 
-### Design Hierarchy 
+### 🎛️ Top-Level Architecture: 4-Tap FIR Filter
 
-## 🎛️ Top-Level Architecture: 4-Tap FIR Filter
+To practically evaluate the approximate 4:2 compressors, they are instantiated within the multiplier-accumulator (MAC) pipeline of a **4-Tap Direct-Form FIR Filter**. 
 
-While the core focus of this project is the approximate 4:2 compressors, they are practically implemented and evaluated within the context of a **4-Tap Direct-Form Finite Impulse Response (FIR) Filter**. 
-
-The FIR filter acts as the top-level testing ground for the approximate multipliers. It consists of three main stages:
-
-1. **Delay Line (Shift Registers):** The 8-bit input signal (`x_in`) is passed through a chain of three D-flip-flop delay registers (`x1`, `x2`, `x3`) on each positive clock edge.
-2. **Approximate Multiplier Array:** Four 8x8 multipliers operate in parallel. Each multiplier takes one delayed input signal and multiplies it by a fixed, positive stress-test coefficient (`h0`, `h1`, `h2`, `h3`). **This is where the Exact, 1-Error, or 2-Error compressor logic is instantiated.**
-3. **Accumulation (Adder Tree):** The 16-bit outputs from the four multipliers (`m0`, `m1`, `m2`, `m3`) are summed together to produce the final filtered output (`y_out`).
+The filter consists of three main stages:
+1. **Delay Line (Shift Registers):** The 8-bit input signal (`x_in`) propagates through a chain of three D-flip-flop delay registers on each positive clock edge.
+2. **Approximate Multiplier Array:** Four 8x8 multipliers operate in parallel, multiplying the delayed signals by fixed stress-test coefficients (`h0` through `h3`). **The Exact, 1-Error, or 2-Error compressor logic is implemented here.**
+3. **Accumulation (Adder Tree):** The 16-bit outputs from the multipliers are summed to produce the final filtered output (`y_out`).
 
 ```text
-       x_in ──┬────────►[ Z⁻¹ ]──┬────────►[ Z⁻¹ ]──┬────────►[ Z⁻¹ ]──┐
-              │                  │                  │                  │
-              ▼                  ▼                  ▼                  ▼
-            ( M0 )             ( M1 )             ( M2 )             ( M3 )  ◄── Approximate Multipliers
-              ▲                  ▲                  ▲                  ▲
-              │                  │                  │                  │
-              h0                 h1                 h2                 h3
-              │                  │                  │                  │
-              └────────┬─────────┴────────┬─────────┴────────┬─────────┘
-                       │                  │                  │
-                       ▼                  ▼                  ▼
-                     [ + ] ◄────────────[ + ] ◄────────────[ + ]  ◄── Adder Tree
-                       │
-                     y_out
-```
-The approximate compressors are built upon 4-way sorting networks. By selectively removing sorting elements, 
-we trade mathematical precision for physical hardware efficiency.
-```text
-┌─────────────────────────────────────────────────────────┐
-│                    INPUT SIGNALS                        │
-│                 x1, x2, x3, x4, Cin                     │
-└─────────────────┬───────────────────────────────────────┘
-                  │
-         ┌────────▼────────┐
-         │ 4-WAY SORTING   │ ◄── Exact: Full sorting
-         │    NETWORK      │ ◄── 1-Error: 5 Sorters
-         │                 │ ◄── 2-Error: 4 Sorters
-         └────────┬────────┘
-                  │
-         ┌────────▼────────┐
-         │  OUTPUT LOGIC   │ ◄── Reconstructs Sum & Carry
-         │ (AND / OR / XOR)│     The "XOR Trap" occurs here
-         └─────────────────┘
-                  │
-           Sum ◄──┴──► Carry
+           x_in ──┬────────►[ Z⁻¹ ]──┬────────►[ Z⁻¹ ]──┬────────►[ Z⁻¹ ]──┐
+                  │                  │                  │                  │
+                  ▼                  ▼                  ▼                  ▼
+                ( M0 )             ( M1 )             ( M2 )             ( M3 )  ◄── Approximate Multipliers
+                  ▲                  ▲                  ▲                  ▲
+                  │                  │                  │                  │
+                  h0                 h1                 h2                 h3
+                  │                  │                  │                  │
+                  └────────┬─────────┴────────┬─────────┴────────┬─────────┘
+                           │                  │                  │
+                           ▼                  ▼                  ▼
+                         [ + ] ◄────────────[ + ] ◄────────────[ + ]  ◄── Adder Tree
+                           │
+                         y_out
 ```
 
 ### ⚙️ Compressor Variants
 
-1. **Exact 4:2 Compressor:** Fully accurate mathematical compression using standard sorting structures.
-2. **1-Error Compressor:** Utilizes 5 sorters. The `Sum` and `Carry` are calculated using highly efficient `AND`/`OR` logic.
-3. **2-Error Compressor:** Utilizes 4 sorters (achieving a theoretical reduction of 1 `AND` and 1 `OR` gate). However, to maintain the correct logic truth table, the output `Sum` relies on an `XOR` operation, and the `Carry` requires an additional `AND` gate. 
+The approximate compressors are built upon 4-way sorting networks. By selectively removing sorting elements, we trade mathematical precision for physical hardware efficiency.
 
----
-
-## 🔄 Complete ASIC Design Flow (OpenROAD
-
-<div align="center">
-
-<img src="./images/Openlane_flow.webp" width="400">
-
-</div>
-
-## ⚠️ The "XOR Trap" and CMOS Standard Cells
-
-During initial ASIC synthesis, the 2-error design yielded a counter-intuitive result: despite having *fewer* structural sorters than the 1-error design, it consumed **more silicon area** and exhibited a **longer critical path**. 
-
-**The Root Cause:** In physical CMOS layouts, primitive `AND`/`OR` gates require ~4–6 transistors. `XOR` gates, however, require 10–12 transistors and complex internal wiring. 
-
-### 🔧 The AOI Optimization Fix
-To overcome this, the 2-error Boolean equation was manually expanded at the RTL level. This forced the synthesis tool to abandon discrete, bulky `XOR` cells and map the logic into ultra-fast **AOI (AND-OR-Invert)** compound standard cells:
-
-```verilog
-// Unoptimized (Forces bulky XOR standard cells)
-assign Sum = (A ^ h1) | h2; 
-
-// Optimized (Maps to high-speed, low-power AOI compound cells)
-assign Sum = (A & ~h1) | (~A & h1) | h2; 
+```text
+    ┌─────────────────────────────────────────────────────────┐
+    │                   INPUT SIGNALS                         │
+    │                x1, x2, x3, x4, Cin                      │
+    └─────────────────┬───────────────────────────────────────┘
+                      │
+             ┌────────▼────────┐
+             │ 4-WAY SORTING   │ ◄── Exact: Full sorting (6 Sorters)
+             │    NETWORK      │ ◄── 1-Error: 5 Sorters
+             │                 │ ◄── 2-Error: 4 Sorters
+             └────────┬────────┘
+                      │
+             ┌────────▼────────┐
+             │  OUTPUT LOGIC   │ ◄── Reconstructs Sum & Carry
+             │ (AND / OR / XOR)│     The "XOR Trap" occurs here
+             └─────────────────┘
+                      │
+               Sum ◄──┴──► Carry
 ```
 
 ---
 
-## 📊 6. Final ASIC Physical Synthesis Results (SkyWater 130nm)
-
-Following the AOI standard-cell optimization, the physical data established a distinct **Pareto optimization frontier**. To accurately measure the efficiency trade-offs, the **Area-Delay Product (ADP)** and **Power-Delay Product (PDP)** were calculated.
+## 🔄 Complete ASIC Design Flow
 
 <div align="center">
-
-| Metric | Exact Filter | 1-Error Filter | 2-Error Filter (Optimized) | 🏆 Optimal Arch |
-|:---|:---:|:---:|:---:|:---:|
-| **Logic Gates** | 814 | 773 | **771** | **2-Error** |
-| **Silicon Area (μm²)** | 18,086 | **16,583** | 17,116 | **1-Error** |
-| **Critical Path (ns)** | 6.03 | 5.83 | **5.54** | **2-Error** |
-| **Dynamic Power (μW)**| 0.001573 | 0.001412 | **0.001286** | **2-Error** |
-| **ADP (μm²·ns)** | 109,058 | 96,678 | **94,822** | **2-Error** |
-| **PDP / Energy (fJ)** | 0.00948 | 0.00823 | **0.00712** | **2-Error** |
-
-*(Note: Dynamic power is calculated as `internal_power` + `switching_power`. PDP yields femtoJoules ($fJ$))*
+  <img src="./images/Openlane_flow.webp" width="400" alt="OpenLane Flow">
 </div>
 
-### 🔑 Key Engineering Conclusions
+### ⚠️ The "XOR Trap" in Physical Silicon
 
-1. **Absolute Area vs. Architecture:** The **1-error architecture** is the undisputed champion for strict area reduction. The physical footprint of its one extra sorting element is actually smaller than the complex XOR output routing penalty of the 2-error design. 
-2. **Speed & Absolute Power:** The **2-error architecture**, when mapped to AOI cells, provides the ultimate optimization for execution speed (5.54 ns) and dynamic power (0.001286 μW).
-3. **Overall Efficiency (Figures of Merit):** While the 1-error design is physically smaller, the **2-error design wins both the ADP and PDP metrics**. This proves that the speed and power benefits of the 2-error architecture vastly outweigh its slight area penalty, making it the most energy-efficient and well-rounded hardware accelerator of the three.
+During OpenLane ASIC synthesis, the 2-error design yielded a counter-intuitive result: despite having *fewer* structural sorters than the 1-error design, it consumed **more silicon area**, used **more logic gates**, and exhibited a **longer critical path**. 
 
-`![ASIC Layout](docs/asic_layout.png)`
-### 🔋 FPGA Implementation Results
+**The Root Cause:** In physical CMOS standard-cell libraries, primitive `AND`/`OR` gates (used extensively in the 1-Error design) are incredibly dense, requiring roughly 4 to 6 transistors. Conversely, `XOR` gates (required to reconstruct the Sum in the 2-Error logic) require 10 to 12 transistors and complex internal wiring. The physical footprint and routing congestion of this XOR output logic completely negated the area saved by removing the 4-transistor sorter gates.
 
-Prior to ASIC synthesis, the multipliers were validated on an FPGA platform. Integrating the compressors into an 8x8 MAC unit demonstrated that for high-value computations, the controlled deviation of the approximate designs significantly reduces overall power consumption and LUT utilization compared to exact multiplication.
+---
+
+## 📊 Final ASIC Physical Synthesis Results
+
+The physical data from the OpenLane runs established a distinct and fascinating Pareto optimization frontier across Area-Delay Product (ADP) and Power-Delay Product (PDP).
+
+| Metric | Exact Filter | 1-Error Filter | 2-Error Filter | 🏆 Standard Cell Champion |
+| :--- | :---: | :---: | :---: | :---: |
+| **Total Physical Cells** | 2,521 | **2,481** | 2,702 | **1-Error** |
+| **Silicon Area (μm²)** | 18,517.76 | **17,840.86** | 18,830.56 | **1-Error** |
+| **Critical Path (ns)** | **6.15** | 6.20 | 6.32 | **Exact** |
+| **Dynamic Power (μW)**| 1.758 | **1.578** | 1.678 | **1-Error** |
+| **ADP (μm²·ns)** | 113,884.22 | **110,613.33** | 119,009.13 | **1-Error** |
+| **PDP / Energy (pJ)** | 10.81 | **9.78** | 10.60 | **1-Error** |
+
+*(Note: Total Dynamic power is calculated as `power_typical_internal_uW` + `power_typical_switching_uW`)*
 
 ---
 
@@ -158,174 +124,71 @@ Prior to ASIC synthesis, the multipliers were validated on an FPGA platform. Int
 
 #### 🗺️ 1-Error & 2-Error Schematics
 <div align="center">
-
-<img src="./images/Compressor_1error.png" width="400">
-<img src="./images/Compressor_2error.png" width="400">
-
+  <img src="./images/Compressor_1error.png" width="400" alt="1-Error Schematic">
+  <img src="./images/Compressor_2error.png" width="400" alt="2-Error Schematic">
+  <p><i>Comparison between 1-Error and 2-Error approximate compressor architectures</i></p>
 </div>
-
-<p><i>Comparison between 1-Error and 2-Error approximate compressor architectures*</i></p>
----
-
-<div align="center">
-
-<img src="./images/Approx_multiplier_dot_diagram.png" width="400">
-
-</div>
-
-<div align="center">
-
-<img src="./images/Approx_multiplier_decoded_dot_diagram.png" width="400">
-
-</div>
-
-<p><i>Dot diagram and decoded dot diagrams for the approximate multipliers used in FIR Filter</i></p>
----
 
 #### 🧱 ASIC Physical Layout (GDSII)
 <div align="center">
-
-<img src="./images/fir_exact_gds.png" width="400">
-<img src="./images/fir_1error_gds.png" width="400">
-<img src="./images/fir_2error_gds.png" width="400">
-
+  <img src="./images/fir_exact_gds.png" width="300" alt="Exact GDS">
+  <img src="./images/fir_1error_gds.png" width="300" alt="1-Error GDS">
+  <img src="./images/fir_2error_gds.png" width="300" alt="2-Error GDS">
+  <p><i>SkyWater 130nm — 2D layout views showing routed standard cells and power delivery networks.</i></p>
 </div>
-
-<p><i>SkyWater 130nm — 2D layout view showing complete routed standard cells and power delivery network.</i></p>
----
-#### 🔋 FPGA Implementation
-<div align="center">
-
-<img src="./images/Approx_mult_impl_using_compressor_1error.png" width="400">
-<img src="./images/Approx_mult_impl_using_compressor_2error.png" width="400">
-
-</div>
----
-
-## ⚙️ Compressor Architecture & Variants
-
-The core of this FIR filter design relies on **4:2 Compressors** generated via **Sorting Networks**. Unlike traditional compressors that use a carry-propagation or XOR-sum tree, these designs first reorder the input bits. By strategically "pruning" (removing) sorting elements from the network, we trade mathematical precision for significant gains in silicon area and power efficiency.
-
-### 1. Exact 4:2 Compressor (The Baseline)
-* **Architecture:** Implements a full 4-way sorting network utilizing **6 sorting elements**.
-* **Precision:** Guaranteed **zero mathematical error** across all $2^5$ input combinations.
-* **Role:** Acts as the "Gold Standard" baseline to measure the area-savings and power-reduction of the approximate variants. It utilizes standard `XOR`/`MUX` logic to reconstruct the Sum and Carry from a fully sorted input sequence.
-
-### 2. 1-Error Approximate Compressor
-* **Architecture:** Pruned to **5 sorting elements** (1 node removed).
-* **Accuracy:** Introduces a maximum error magnitude of 1 in specific, rare input combinations.
-* **Efficiency:** By removing one sorter, it significantly reduces the combinatorial depth. The output logic is simplified to use high-efficiency `AND`/`OR` gates, making it the **most area-efficient variant** in the Sky130 PDK.
-
-### 3. 2-Error Approximate Compressor
-* **Architecture:** Aggressively pruned to **4 sorting elements** (2 nodes removed).
-* **Accuracy:** Introduces a higher error rate but achieves the lowest transistor count within the sorting core.
-* **Optimization:** Utilizes **AOI (AND-OR-Invert) optimization** to bypass physical CMOS routing penalties. It achieves the **lowest Power-Delay Product (PDP)** and the fastest timing (5.54 ns).
 
 ---
 
-## 🔍 Error Characterization & Corner Cases
+## 🔍 Error Characterization & The "Cancellation" Discovery
 
-To evaluate the behavior of approximate compressors under extreme operating conditions, the FIR filter was tested with **high-amplitude input values**. These corner cases highlight how approximation propagates through the multiplier-accumulator pipeline.
-
-The following comparison shows the deviation of the **1-Error** and **2-Error** FIR filters relative to the **exact implementation**.
+While the 1-Error design wins on hardware efficiency, the data completely overturned theoretical expectations regarding **System-Level Accuracy**.
 
 <div align="center">
-
-<img src="./images/fir_error_comparision_plot1.png" width="600">
-
-</div>
-
-<div align="center">
-
-<img src="./images/fir_error_comparision_plot2.png" width="600">
-
+  <img src="./images/fir_error_comparision_plot1.png" width="600" alt="Error Plot 1">
+  <img src="./images/fir_error_comparision_plot2.png" width="600" alt="Error Plot 2">
 </div>
 
 ### 📊 Numerical Error Comparison
 
-The table below lists several simulation timestamps where the FIR filter was stimulated with larger input values.  
-Absolute error is calculated as:
+| Time (ns) | Binary Input | Decimal Input | Exact `y_out` | 1-Error `y_out` | 2-Error `y_out` | 1-Error Abs Err | 2-Error Abs Err |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| 55000 | `00001000` | 8 | 3152 | 1744 | **3152** | 1408 | **0** |
+| 95000 | `00010101` | 21 | 8274 | 3922 | **8274** | 4352 | **0** |
+| 135000 | `00011111` | 31 | 12214 | 8326 | **12166** | 3888 | **48** |
+| 175000 | `00111111` | 63 | 24822 | 14470 | **24710** | 10352 | **112** |
+| 215000 | `01111111` | 127 | 50038 | 24710 | **49798** | 25328 | **240** |
 
-\[
-|y_{exact} - y_{approx}|
-\]
+### 🔎 Key Observations: The Error Decorrelation Effect
 
-| Time (ns) | Binary Input | Decimal Input | Exact `y_out` | 1-Error `y_out` | 2-Error `y_out` | 1-Error Abs Error | 2-Error Abs Error |
-|-----------|--------------|---------------|---------------|-----------------|-----------------|-------------------|-------------------|
-| 55000  | 00001000 | 8   | 1550  | 788  | 788   | 762  | 762 |
-| 95000  | 00010101 | 21  | 4803  | 3152 | 3152  | 1651 | 1651 |
-| 135000 | 00011111 | 31  | 9544  | 8274 | 18962 | 1270 | 11958 |
-| 175000 | 00111111 | 63  | 16278 | 12214 | 19686 | 4064 | 11536 |
-| 215000 | 01111111 | 127 | 32950 | 24822 | 40294 | 8128 | 23600 |
-
-### 🔎 Key Observations
-
-- For **low-to-moderate input values**, both approximate architectures track the exact FIR output closely.
-- The **1-Error compressor** produces smaller deviations across most test cases.
-- The **2-Error compressor** can introduce larger deviations for high-amplitude inputs due to compounded approximation inside the multiplier tree.
-- Despite higher instantaneous error, the **2-Error architecture still provides superior power-delay efficiency**, as demonstrated in the ASIC physical synthesis results.
-
-These results demonstrate the fundamental **approximate computing trade-off**:
-
-- **Higher approximation → Lower hardware cost**
-- **Lower approximation → Higher numerical accuracy**
-
-The choice between the **1-Error** and **2-Error** designs therefore depends on the acceptable error tolerance of the target DSP application.
-In approximate computing, understanding the worst-case scenarios is just as important as the average error. The "pruning" of sorting elements causes the network to fail under specific high-density input patterns. 
-
-### 🟢 The "Zero-Error" Zone (Low Density)
-Both the 1-Error and 2-Error compressors maintain **100% exact precision** when the number of active input bits is low (0 or 1).
-* **Why it happens:** The remaining sorters are sufficient to correctly identify and route a single `1` to the LSB (Sum) without requiring the missing sorting elements.
-* **System Impact:** For sparse signals or quiet periods in DSP data, the filter behaves exactly like an Exact FIR filter.
-
-### 🟡 The 1-Error Corner Case (Maximum Capacity)
-The **1-Error Compressor** (5 Sorters) fails only when **all 4 primary inputs are high (`1111`)** and $C_{in}$ is low.
-* **Exact Result:** Sum = 0, Carry = 2
-* **Approximate Result:** Sum = 1, Carry = 1
-* **Deviation:** A magnitude error of $|-1|$.
-* **Architectural Logic:** By removing the 6th sorter, the hardware "misses" the final carry-out bit when the pipeline is at absolute maximum capacity.
-
-### 🔴 The 2-Error "Collision" Trap (High Density)
-The **2-Error Compressor** (4 Sorters) begins to deviate when **3 or more inputs are high**. 
-* **Key Corner Case:** Input pattern (`1110`).
-* **Exact Result:** Sum = 1, Carry = 1
-* **Approximate Result:** Sum = 0, Carry = 1
-* **Deviation:** A magnitude error of $|-1|$.
-* **Architectural Logic:** The removal of two sorting elements creates "collisions" in the internal routing, where two high bits are forced into the same logic path and one is effectively "dropped" before reaching the output logic.
+* **The 1-Error Trap (Systematic Bias):** The 1-Error compressor suffers from massive compounding error. Because it only introduces error in one direction (+1), these errors **accumulate linearly** across the FIR filter's adder tree.
+* **The 2-Error Triumph (Error Cancellation):** The 2-Error compressor introduces both +1 and -1 errors at the bit level. When integrated into a large multiplier pipeline, these positive and negative errors **statistically cancel each other out**.
+* **Result:** The 2-Error design maintains an extraordinarily low Mean Absolute Error, representing a **99% higher system-level accuracy** compared to the 1-Error variant.
 
 ---
 
-## 📈 Error Statistics Summary
+## 🌍 The Multi-Platform Perspective: Why the 2-Error Matters
 
-| Metric | Exact | 1-Error | 2-Error |
-| :--- | :---: | :---: | :---: |
-| **Pass Rate (Exactness)** | 100% | 93.75% | 75.0% |
-| **Max Error Magnitude** | 0 | 1 | 1 |
-| **Mean Error Distance (MED)** | 0 | 0.0625 | 0.25 |
+If the 2-Error compressor is physically larger and consumes more power in our OpenLane results, why does this architecture exist? 
 
-> **💡 Engineering Takeaway:**
-> *"While the 2-Error design has a 25% error rate, the **Max Error Magnitude never exceeds 1**. This makes it an ideal candidate for error-tolerant applications like Lossy Image Compression (where a pixel change of 1/255 is invisible to the human eye) but unsuitable for high-precision scientific computing."*
-> 
+The answer is that our results exposed a **blind spot in standard-cell EDA synthesis**, rather than a flaw in the mathematics. Depending on the target hardware platform, the 2-Error architecture becomes incredibly powerful:
+
+1. **In FPGAs (Look-Up Tables):** Unlike standard cells where an XOR gate is huge, FPGAs map logic into Look-Up Tables (LUTs). To an FPGA, an `AND` gate costs exactly 1 LUT, and an `XOR` gate also costs exactly 1 LUT. Because the 2-Error design has fewer overall logical nodes, **on an FPGA, the 2-Error design would likely be the smallest, most efficient, AND most accurate architecture.**
+   
+2. **In Custom Transistor Layouts:** If an analog layout engineer designed this circuit by hand, they wouldn't use a bulky 12-transistor standard-cell XOR. They would design a custom 6-transistor Pass-Transistor Logic (PTL) XOR gate. If implemented via custom layout, the 2-Error design would easily beat the 1-Error design in silicon area.
+
+**The Ultimate Takeaway:** * Use the **1-Error Design** if you are compiling to a standard-cell ASIC and your only goal is minimizing area/power.
+* Use the **2-Error Design** if you are deploying to an FPGA, utilizing custom transistor layouts, or if your application strictly demands high Signal Integrity and error decorrelation.
 
 ---
-<!--
-#### 📊 FPGA Power Reports
-`![FPGA Power](./docs/fpga_power.png)`
-*Hardware utilization and dynamic power estimates from the FPGA validation phase.*
--->
-
 
 ## 🚀 Getting Started
 
 ### Prerequisites
 
-```bash
-# Required Open-Source EDA Tools
-- Icarus Verilog & GTKWave (Simulation)
-- OpenLane / OpenROAD (ASIC physical design flow)
-- Magic / KLayout (GDSII Layout viewing)
-- SkyWater 130nm PDK (`sky130_fd_sc_hd`)
-```
+* Icarus Verilog & GTKWave (Simulation)
+* OpenLane / OpenROAD (ASIC physical design flow)
+* Magic / KLayout (GDSII Layout viewing)
+* SkyWater 130nm PDK (`sky130_fd_sc_hd`)
 
 ### Installation and Execution
 
@@ -347,39 +210,11 @@ Navigate to the generated `runs/` directory and open the `.gds` files using KLay
 
 ---
 
-## ❓ Frequently Asked Questions
-
-<details>
-<summary><b>Q: Why did the 2-error design consume MORE area than the 1-error design?</b></summary>
-
-**Answer**: This is the "XOR Trap." While the 2-error design saves one AND and one OR gate *inside* the sorting network, its output logic requires an XOR gate to reconstruct the Sum. In physical CMOS, an XOR standard cell requires 10-12 transistors and complex wiring, negating the area saved by removing the 4-transistor sorter gates.
-</details>
-
-<details>
-<summary><b>Q: How did you fix the timing delay on the 2-error compressor?</b></summary>
-
-**Answer**: We expanded the `(A ^ h1)` XOR logic into its primitive components `(A & ~h1) | (~A & h1)`. This prevented the Yosys synthesizer from using bulky XOR standard cells, allowing it to map the logic directly into high-speed, single-stage **AOI (AND-OR-Invert)** compound logic cells, dropping the delay from 5.98ns to 5.54ns.
-</details>
-
-<details>
-<summary><b>Q: Which compressor should I use for my project?</b></summary>
-
-**Answer**: If your primary constraint is **Silicon Area** (e.g., IoT edge endpoints), use the **1-Error** design. If your primary constraints are **Speed and Power** (e.g., high-throughput DSP pipelines), use the **2-Error** design optimized with AOI logic.
-</details>
-
-<details>
-<summary><b>Q: Why did you use a Direct Form FIR filter architecture instead of Transposed Form?</b></summary>
-
-**Answer**: Direct Form was intentionally chosen to isolate the metrics of the approximate multipliers. Transposed Form requires wider pipeline registers (to store the 16-bit accumulated sums), which would have artificially inflated the total silicon area with D-Flip-Flops and obscured the area savings of the approximate compressors. Furthermore, the unpipelined adder tree in the Direct Form architecture allowed us to accurately expose and measure the combinatorial delay penalties (the "XOR Trap") introduced by the 2-error approximation logic.
-</details>
-
----
-
 ## 🔮 Future Scope
 
-- [ ] **Tapeout:** Submit the optimized macros to the Google/SkyWater Open MPW shuttle for physical fabrication.
-- [ ] **Advanced Nodes:** Port the RTL to predictive sub-nanometer nodes (e.g., ASAP7 / FreePDK45) to observe how the "XOR Trap" scales with FinFET technology.
-- [ ] **System Integration:** Integrate these optimized MAC units into a complete systolic array for AI/ML image classification accelerators.
+* [ ] **FPGA Implementation:** Port the RTL to a Xilinx Artix-7 to physically prove the FPGA LUT advantage of the 2-Error design.
+* [ ] **AOI Optimization:** Explore manual standard-cell instantiation (AND-OR-Invert) to bypass the XOR routing penalty.
+* [ ] **Tapeout:** Submit the optimized macros to the Google/SkyWater Open MPW shuttle for physical fabrication.
 
 ---
 
@@ -388,7 +223,6 @@ Navigate to the generated `runs/` directory and open the `.gds` files using KLay
 This project is released under the MIT License. See the [LICENSE](LICENSE) file for complete terms.
 
 ---
-
-### ⭐ Star this repository if you found this VLSI analysis helpful!
-
+<div align="center">
+  <b>⭐ Star this repository if you found this VLSI analysis helpful!</b>
 </div>
