@@ -98,7 +98,12 @@ we trade mathematical precision for physical hardware efficiency.
 
 ## 🔄 Complete ASIC Design Flow 
 *OpenROAD Flow*
-![OpenROAD Flow](./images/Openlane_flow.webp)
+
+<div align="center">
+
+<img src="./images/Openlane_flow.webp" width="750">
+
+</div>
 
 ```text
 ┌─────────────────────────────────────────────────────────────┐
