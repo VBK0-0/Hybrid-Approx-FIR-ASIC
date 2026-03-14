@@ -193,20 +193,6 @@ Prior to ASIC synthesis, the multipliers were validated on an FPGA platform. Int
 
 <p><i>SkyWater 130nm — 2D layout view showing complete routed standard cells and power delivery network.</i></p>
 ---
-
-<div align="center">
-
-<img src="./images/fir_error_comparision_plot.png" width="600">
-
-</div>
-
-<p><i>FIR Error Comparision Plot</i></p>
----
-<!--
-#### 📊 FPGA Power Reports
-`![FPGA Power](./docs/fpga_power.png)`
-*Hardware utilization and dynamic power estimates from the FPGA validation phase.*
--->
 #### 🔋 FPGA Implementation
 <div align="center">
 
@@ -215,6 +201,80 @@ Prior to ASIC synthesis, the multipliers were validated on an FPGA platform. Int
 
 </div>
 ---
+## ⚙️ Compressor Architecture & Variants
+
+The core of this FIR filter design relies on **4:2 Compressors** generated via **Sorting Networks**. Unlike traditional compressors that use a carry-propagation or XOR-sum tree, these designs first reorder the input bits. By strategically "pruning" (removing) sorting elements from the network, we trade mathematical precision for significant gains in silicon area and power efficiency.
+
+### 1. Exact 4:2 Compressor (The Baseline)
+* **Architecture:** Implements a full 4-way sorting network utilizing **6 sorting elements**.
+* **Precision:** Guaranteed **zero mathematical error** across all $2^5$ input combinations.
+* **Role:** Acts as the "Gold Standard" baseline to measure the area-savings and power-reduction of the approximate variants. It utilizes standard `XOR`/`MUX` logic to reconstruct the Sum and Carry from a fully sorted input sequence.
+
+### 2. 1-Error Approximate Compressor
+* **Architecture:** Pruned to **5 sorting elements** (1 node removed).
+* **Accuracy:** Introduces a maximum error magnitude of 1 in specific, rare input combinations.
+* **Efficiency:** By removing one sorter, it significantly reduces the combinatorial depth. The output logic is simplified to use high-efficiency `AND`/`OR` gates, making it the **most area-efficient variant** in the Sky130 PDK.
+
+### 3. 2-Error Approximate Compressor
+* **Architecture:** Aggressively pruned to **4 sorting elements** (2 nodes removed).
+* **Accuracy:** Introduces a higher error rate but achieves the lowest transistor count within the sorting core.
+* **Optimization:** Utilizes **AOI (AND-OR-Invert) optimization** to bypass physical CMOS routing penalties. It achieves the **lowest Power-Delay Product (PDP)** and the fastest timing (5.54 ns).
+
+---
+
+## 🔍 Error Characterization & Corner Cases
+
+<div align="center">
+
+<img src="./images/fir_error_comparision_plot.png" width="600">
+
+</div>
+
+<p><i>FIR Error Comparision Plot</i></p>
+
+In approximate computing, understanding the worst-case scenarios is just as important as the average error. The "pruning" of sorting elements causes the network to fail under specific high-density input patterns. 
+
+### 🟢 The "Zero-Error" Zone (Low Density)
+Both the 1-Error and 2-Error compressors maintain **100% exact precision** when the number of active input bits is low (0 or 1).
+* **Why it happens:** The remaining sorters are sufficient to correctly identify and route a single `1` to the LSB (Sum) without requiring the missing sorting elements.
+* **System Impact:** For sparse signals or quiet periods in DSP data, the filter behaves exactly like an Exact FIR filter.
+
+### 🟡 The 1-Error Corner Case (Maximum Capacity)
+The **1-Error Compressor** (5 Sorters) fails only when **all 4 primary inputs are high (`1111`)** and $C_{in}$ is low.
+* **Exact Result:** Sum = 0, Carry = 2
+* **Approximate Result:** Sum = 1, Carry = 1
+* **Deviation:** A magnitude error of $|-1|$.
+* **Architectural Logic:** By removing the 6th sorter, the hardware "misses" the final carry-out bit when the pipeline is at absolute maximum capacity.
+
+### 🔴 The 2-Error "Collision" Trap (High Density)
+The **2-Error Compressor** (4 Sorters) begins to deviate when **3 or more inputs are high**. 
+* **Key Corner Case:** Input pattern (`1110`).
+* **Exact Result:** Sum = 1, Carry = 1
+* **Approximate Result:** Sum = 0, Carry = 1
+* **Deviation:** A magnitude error of $|-1|$.
+* **Architectural Logic:** The removal of two sorting elements creates "collisions" in the internal routing, where two high bits are forced into the same logic path and one is effectively "dropped" before reaching the output logic.
+
+---
+
+## 📈 Error Statistics Summary
+
+| Metric | Exact | 1-Error | 2-Error |
+| :--- | :---: | :---: | :---: |
+| **Pass Rate (Exactness)** | 100% | 93.75% | 75.0% |
+| **Max Error Magnitude** | 0 | 1 | 1 |
+| **Mean Error Distance (MED)** | 0 | 0.0625 | 0.25 |
+
+> **💡 Engineering Takeaway:**
+> *"While the 2-Error design has a 25% error rate, the **Max Error Magnitude never exceeds 1**. This makes it an ideal candidate for error-tolerant applications like Lossy Image Compression (where a pixel change of 1/255 is invisible to the human eye) but unsuitable for high-precision scientific computing."*
+> 
+
+---
+<!--
+#### 📊 FPGA Power Reports
+`![FPGA Power](./docs/fpga_power.png)`
+*Hardware utilization and dynamic power estimates from the FPGA validation phase.*
+-->
+
 
 ## 🚀 Getting Started
 
