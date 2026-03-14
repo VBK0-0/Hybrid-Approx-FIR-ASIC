@@ -159,8 +159,18 @@ Prior to ASIC synthesis, the multipliers were validated on an FPGA platform. Int
 <div align="center">
 
 #### 🗺️ 1-Error & 2-Error Schematics
-![Compressor_1_error](./images/Compressor_1error.png)
-![Compressor_2_error](./images/Compressor_2error.png)
+<div align="left">
+
+<img src="./images/Compressor_1error.png" width="400">
+
+</div>
+
+<div align="right">
+
+<img src="./images/Compressor_2error.png" width="400">
+
+</div>
+
 
 *Architectural block diagrams illustrating the reduction of sorting elements.*
 ---
