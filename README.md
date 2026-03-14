@@ -231,8 +231,9 @@ The core of this FIR filter design relies on **4:2 Compressors** generated via *
 
 </div>
 
+<div align="center">
 <p><i>FIR Error Comparision Plot</i></p>
-
+</div>
 In approximate computing, understanding the worst-case scenarios is just as important as the average error. The "pruning" of sorting elements causes the network to fail under specific high-density input patterns. 
 
 ### 🟢 The "Zero-Error" Zone (Low Density)
