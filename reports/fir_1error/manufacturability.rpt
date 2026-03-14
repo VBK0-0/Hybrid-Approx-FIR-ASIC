@@ -1,19 +1,19 @@
 Design Name: FIR_Filter_4Tap_1error
-Run Directory: /openlane/designs/fir_1error/runs/RUN_2026.03.10_17.21.05
+Run Directory: /openlane/designs/fir_1error/runs/RUN_2026.03.14_19.44.58
 ----------------------------------------
 
 Magic DRC Summary:
-Source: /openlane/designs/fir_1error/runs/RUN_2026.03.10_17.21.05/reports/signoff/drc.rpt
+Source: /openlane/designs/fir_1error/runs/RUN_2026.03.14_19.44.58/reports/signoff/drc.rpt
 Total Magic DRC violations is 0
 ----------------------------------------
 
 LVS Summary:
-Source: /openlane/designs/fir_1error/runs/RUN_2026.03.10_17.21.05/logs/signoff/39-FIR_Filter_4Tap_1error.lef.lvs.log
-Number of nets: 840                        |Number of nets: 840                        
+Source: /openlane/designs/fir_1error/runs/RUN_2026.03.14_19.44.58/logs/signoff/39-FIR_Filter_4Tap_1error.lef.lvs.log
+Number of nets: 884                        |Number of nets: 884                        
 Design is LVS clean.
 ----------------------------------------
 
 Antenna Summary:
-Source: /openlane/designs/fir_1error/runs/RUN_2026.03.10_17.21.05/logs/signoff/41-arc.log
-Pin violations: 0
-Net violations: 0
+Source: /openlane/designs/fir_1error/runs/RUN_2026.03.14_19.44.58/logs/signoff/41-arc.log
+Pin violations: 1
+Net violations: 1
