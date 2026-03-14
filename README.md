@@ -231,7 +231,13 @@ The following comparison shows the deviation of the **1-Error** and **2-Error** 
 
 <div align="center">
 
-<img src="./images/fir_error_comparision_plot.png" width="600">
+<img src="./images/fir_error_comparision_plot1.png" width="600">
+
+</div>
+
+<div align="center">
+
+<img src="./images/fir_error_comparision_plot2.png" width="600">
 
 </div>
 
