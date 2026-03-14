@@ -26,6 +26,7 @@ module FIR_Filter_4Tap_2error(
             x3 <= x2;
         end
     end
+    
     // Accumulation
     assign y_out = m0 + m1 + m2 + m3;
 endmodule
@@ -86,6 +87,7 @@ module Approximate_Multiplier_8X8_bits_2error(
     assign Z_T = S1 + S2 + (C1 << 1) + (C2 << 1);
 
 endmodule
+
 // ----------------------------------------------------------------------------------
 // SUBMODULES
 // ----------------------------------------------------------------------------------
@@ -99,7 +101,6 @@ module Two_input_binary_sorter(In1,In2,Out1,Out2);
 
 endmodule
 
-
 // --- NEWLY ADDED 2-ERROR MODULES ---
 
 module Approximate_4_2_Compressor_with_2_errors(x0,x1,x2,x3,Sum,Carry);
@@ -109,8 +110,20 @@ module Approximate_4_2_Compressor_with_2_errors(x0,x1,x2,x3,Sum,Carry);
     wire A, h1, h2, D;
 
     Four_way_Sorting_Network FSN1(x0,x1,x2,x3,A,h1,h2,D);
-    assign Carry = A&h1; 
-    assign Sum = (A^h1)|h2;
+    assign Carry = A & h1; 
+    
+    // --- SYNTHESIS FIREWALL ---
+    // 1. Generate inverted signals explicitly
+    wire not_h1 = ~h1;
+    wire not_A  = ~A;
+
+    // 2. Force Yosys to keep these intermediate AND gates 
+    // This prevents the ABC engine from seeing the XOR pattern!
+    (* keep = "true" *) wire and_term_1 = A & not_h1;
+    (* keep = "true" *) wire and_term_2 = not_A & h1;
+
+    // 3. Final OR gate to complete the Sum logic
+    assign Sum = and_term_1 | and_term_2 | h2;
 
 endmodule
 
@@ -156,5 +169,3 @@ module Compressor_4_2(x0,x1,x2,x3,Cin,Cout,Carry,Sum);
     assign Sum = s0?((~h1)|h2):(h1&(~h2));
 
 endmodule
-
-
