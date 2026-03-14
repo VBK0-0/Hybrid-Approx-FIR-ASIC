@@ -201,6 +201,7 @@ Prior to ASIC synthesis, the multipliers were validated on an FPGA platform. Int
 
 </div>
 ---
+
 ## ⚙️ Compressor Architecture & Variants
 
 The core of this FIR filter design relies on **4:2 Compressors** generated via **Sorting Networks**. Unlike traditional compressors that use a carry-propagation or XOR-sum tree, these designs first reorder the input bits. By strategically "pruning" (removing) sorting elements from the network, we trade mathematical precision for significant gains in silicon area and power efficiency.
