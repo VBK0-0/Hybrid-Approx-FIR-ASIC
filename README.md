@@ -159,8 +159,8 @@ Prior to ASIC synthesis, the multipliers were validated on an FPGA platform. Int
 #### 🗺️ 1-Error & 2-Error Schematics
 <div align="center">
 
-<img src="./images/Compressor_1error.png" width="500">
-<img src="./images/Compressor_2error.png" width="500">
+<img src="./images/Compressor_1error.png" width="400">
+<img src="./images/Compressor_2error.png" width="400">
 
 </div>
 
