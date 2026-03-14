@@ -163,9 +163,8 @@ Prior to ASIC synthesis, the multipliers were validated on an FPGA platform. Int
 <img src="./images/Compressor_2error.png" width="400">
 
 </div>
+*Comparison between 1-Error and 2-Error approximate compressor architectures.*
 
-<p><i>Comparison between 1-Error and 2-Error approximate compressor architectures.</i></p>
-*Architectural block diagrams illustrating the reduction of sorting elements.*
 ---
 
 <div align="center">
