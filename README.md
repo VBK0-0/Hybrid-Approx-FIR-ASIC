@@ -96,46 +96,13 @@ we trade mathematical precision for physical hardware efficiency.
 
 ---
 
-## 🔄 Complete ASIC Design Flow 
-*OpenROAD Flow*
+## 🔄 Complete ASIC Design Flow (OpenROAD
 
 <div align="center">
 
-<img src="./images/Openlane_flow.webp" width="750">
+<img src="./images/Openlane_flow.webp" width="400">
 
 </div>
-
-```text
-┌─────────────────────────────────────────────────────────────┐
-│                    RTL DESIGN (Verilog)                     │
-│         • Exact, 1-Error, and 2-Error Compressors           │
-└────────────────────────┬────────────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────────────┐
-│              LOGIC SYNTHESIS (Yosys & ABC)                  │
-│         • Technology mapping (SkyWater 130nm)               │
-│         • AOI Compound Cell Optimization                    │
-└────────────────────────┬────────────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────────────┐
-│           PHYSICAL DESIGN (OpenLane/OpenROAD)               │
-│         • Floorplanning & PDN Generation                    │
-│         • Placement & Clock Tree Synthesis (CTS)            │
-│         • FastRoute & TritonRoute                           │
-└────────────────────────┬────────────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────────────┐
-│             VERIFICATION & SIGNOFF (Magic)                  │
-│         • Static Timing Analysis (STA)                      │
-│         • Design Rule Checks (DRC)                          │
-│         • Layout vs. Schematic (LVS)                        │
-└─────────────────────────────────────────────────────────────┘
-```
-
----
 
 ## ⚠️ The "XOR Trap" and CMOS Standard Cells
 
