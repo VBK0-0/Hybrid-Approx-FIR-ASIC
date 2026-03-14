@@ -163,8 +163,8 @@ Prior to ASIC synthesis, the multipliers were validated on an FPGA platform. Int
 <img src="./images/Compressor_2error.png" width="400">
 
 </div>
-*Comparison between 1-Error and 2-Error approximate compressor architectures.*
 
+<p><i>Comparison between 1-Error and 2-Error approximate compressor architectures*</i></p>
 ---
 
 <div align="center">
@@ -179,7 +179,7 @@ Prior to ASIC synthesis, the multipliers were validated on an FPGA platform. Int
 
 </div>
 
-*Dot diagram and decoded dot diagrams for the approximate multipliers used in FIR Filter*
+<p><i>Dot diagram and decoded dot diagrams for the approximate multipliers used in FIR Filter</i></p>
 ---
 
 #### 🧱 ASIC Physical Layout (GDSII)
@@ -191,7 +191,7 @@ Prior to ASIC synthesis, the multipliers were validated on an FPGA platform. Int
 
 </div>
 
-*SkyWater 130nm — 2D layout view showing complete routed standard cells and power delivery network.*
+<p><i>SkyWater 130nm — 2D layout view showing complete routed standard cells and power delivery network.</i></p>
 ---
 
 <div align="center">
@@ -200,16 +200,20 @@ Prior to ASIC synthesis, the multipliers were validated on an FPGA platform. Int
 
 </div>
 
-*FIR Error Comparision Plot*
+<p><i>FIR Error Comparision Plot</i></p>
 ---
 <!--
 #### 📊 FPGA Power Reports
 `![FPGA Power](./docs/fpga_power.png)`
-
 *Hardware utilization and dynamic power estimates from the FPGA validation phase.*
+-->
+#### 🔋 FPGA Implementation
+<div align="center">
+
+<img src="./images/Approx_mult_impl_using_compressor_1error.png" width="400">
+<img src="./images/Approx_mult_impl_using_compressor_2error.png" width="400">
 
 </div>
--->
 ---
 
 ## 🚀 Getting Started
