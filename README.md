@@ -144,8 +144,8 @@ The physical data from the OpenLane runs established a distinct and fascinating 
 While the 1-Error design wins on hardware efficiency, the data completely overturned theoretical expectations regarding **System-Level Accuracy**.
 
 <div align="center">
-  <img src="./images/fir_error_comparision_plot1.png" width="600" alt="Error Plot 1">
-  <img src="./images/fir_error_comparision_plot2.png" width="600" alt="Error Plot 2">
+  <img src="./images/fir_error_comparision_plot.png" width="600" alt="Error Plot">
+
 </div>
 
 ### 📊 Numerical Error Comparison
