@@ -156,8 +156,6 @@ Prior to ASIC synthesis, the multipliers were validated on an FPGA platform. Int
 
 ## 🖼 Visual Gallery
 
-<div align="center">
-
 #### 🗺️ 1-Error & 2-Error Schematics
 <div align="center">
 
@@ -166,6 +164,7 @@ Prior to ASIC synthesis, the multipliers were validated on an FPGA platform. Int
 
 </div>
 
+<p><i>Comparison between 1-Error and 2-Error approximate compressor architectures.</i></p>
 *Architectural block diagrams illustrating the reduction of sorting elements.*
 ---
 
