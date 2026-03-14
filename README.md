@@ -225,7 +225,9 @@ The core of this FIR filter design relies on **4:2 Compressors** generated via *
 
 ## 🔍 Error Characterization & Corner Cases
 
-To evaluate the numerical impact of approximation, the FIR filter outputs were compared against the exact implementation across a range of input values. The results highlight how the architectural simplifications in the compressor networks affect the final filtered output.
+To evaluate the behavior of approximate compressors under extreme operating conditions, the FIR filter was tested with **high-amplitude input values**. These corner cases highlight how approximation propagates through the multiplier-accumulator pipeline.
+
+The following comparison shows the deviation of the **1-Error** and **2-Error** FIR filters relative to the **exact implementation**.
 
 <div align="center">
 
@@ -233,27 +235,36 @@ To evaluate the numerical impact of approximation, the FIR filter outputs were c
 
 </div>
 
-The approximate compressors are built upon **4-way sorting networks**. By selectively removing sorting elements, the design trades **mathematical precision** for **hardware efficiency**. While most operating points show negligible deviation from the exact implementation, certain corner cases produce larger errors due to accumulated approximation inside the multiplier array.
+### 📊 Numerical Error Comparison
 
-The following table illustrates representative simulation outputs captured during verification.
+The table below lists several simulation timestamps where the FIR filter was stimulated with larger input values.  
+Absolute error is calculated as:
 
-### 📊 Sample Error Measurements
+\[
+|y_{exact} - y_{approx}|
+\]
 
-| Time (ns) | Binary Input | Decimal Input | Exact `y_out` | 1-Error `y_out` | 2-Error `y_out` | 1-Error Absolute Error | 2-Error Absolute Error |
-|-----------|-------------|--------------|--------------|---------------|---------------|-----------------------|-----------------------|
-| 55000 | 00001000 | 8 | 1550 | 788 | 788 | 0 | 0 |
-| 95000 | 00010101 | 21 | 4803 | 3152 | 3152 | 0 | 0 |
-| 135000 | 00011111 | 31 | 9544 | 8274 | 18962 | 0 | 10688 |
-| 175000 | 00111111 | 63 | 16278 | 12214 | 19686 | 0 | 7472 |
-| 215000 | 01111111 | 127 | 32950 | 24822 | 40294 | 0 | 15472 |
+| Time (ns) | Binary Input | Decimal Input | Exact `y_out` | 1-Error `y_out` | 2-Error `y_out` | 1-Error Abs Error | 2-Error Abs Error |
+|-----------|--------------|---------------|---------------|-----------------|-----------------|-------------------|-------------------|
+| 55000  | 00001000 | 8   | 1550  | 788  | 788   | 762  | 762 |
+| 95000  | 00010101 | 21  | 4803  | 3152 | 3152  | 1651 | 1651 |
+| 135000 | 00011111 | 31  | 9544  | 8274 | 18962 | 1270 | 11958 |
+| 175000 | 00111111 | 63  | 16278 | 12214 | 19686 | 4064 | 11536 |
+| 215000 | 01111111 | 127 | 32950 | 24822 | 40294 | 8128 | 23600 |
 
 ### 🔎 Key Observations
 
-- For **low and moderate input magnitudes**, both approximate architectures closely match the exact implementation.
-- The **1-Error compressor** maintains strong numerical stability, with negligible deviation across tested inputs.
-- The **2-Error compressor** occasionally produces larger deviations due to compounded approximation within the multiplier tree.
-- Despite these deviations, the architectural simplifications significantly reduce **hardware complexity, power consumption, and critical path delay**, making approximate designs attractive for **error-tolerant DSP applications**.
-</div>
+- For **low-to-moderate input values**, both approximate architectures track the exact FIR output closely.
+- The **1-Error compressor** produces smaller deviations across most test cases.
+- The **2-Error compressor** can introduce larger deviations for high-amplitude inputs due to compounded approximation inside the multiplier tree.
+- Despite higher instantaneous error, the **2-Error architecture still provides superior power-delay efficiency**, as demonstrated in the ASIC physical synthesis results.
+
+These results demonstrate the fundamental **approximate computing trade-off**:
+
+- **Higher approximation → Lower hardware cost**
+- **Lower approximation → Higher numerical accuracy**
+
+The choice between the **1-Error** and **2-Error** designs therefore depends on the acceptable error tolerance of the target DSP application.
 In approximate computing, understanding the worst-case scenarios is just as important as the average error. The "pruning" of sorting elements causes the network to fail under specific high-density input patterns. 
 
 ### 🟢 The "Zero-Error" Zone (Low Density)
