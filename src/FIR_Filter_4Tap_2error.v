@@ -4,145 +4,88 @@ module FIR_Filter_4Tap_2error(
     input clk,
     input rst,
     input [7:0] x_in,
-    output [15:0] y_out
+    output [17:0] y_out // 18-bit for full range
 );
+    reg [7:0] x1, x2, x3;
+    parameter h0 = 8'd127, h1 = 8'd119, h2 = 8'd63, h3 = 8'd85;
+    wire [15:0] m0, m1, m2, m3;
 
-    /* delay registers */
-    reg [7:0] x1,x2,x3;
+    // Multiplication
+    Approximate_Multiplier_8X8_bits_2error M0(x_in, h0, m0);
+    Approximate_Multiplier_8X8_bits_2error M1(x1,   h1, m1);
+    Approximate_Multiplier_8X8_bits_2error M2(x2,   h2, m2);
+    Approximate_Multiplier_8X8_bits_2error M3(x3,   h3, m3);
 
-/* Positive Stress-Test Coefficients */
-    parameter h0 = 8'd127;  // Binary: 01111111
-    parameter h1 = 8'd119;  // Binary: 01110111
-    parameter h2 = 8'd63;   // Binary: 00111111
-    parameter h3 = 8'd85;   // Binary: 01010101
-
-    /* multiplier outputs */
-    wire [15:0] m0,m1,m2,m3;
-
-    /* multiplier instances (These now contain the 2-error compressors) */
-    Approximate_Multiplier_8X8_bits_2error M0(.A(x_in), .B(h0), .Z_T(m0));
-    Approximate_Multiplier_8X8_bits_2error M1(.A(x1),   .B(h1), .Z_T(m1));
-    Approximate_Multiplier_8X8_bits_2error M2(.A(x2),   .B(h2), .Z_T(m2));
-    Approximate_Multiplier_8X8_bits_2error M3(.A(x3),   .B(h3), .Z_T(m3));
-
-    /* delay line */
-    always @(posedge clk or posedge rst)
-    begin
-        if(rst)
-        begin
-            x1 <= 0;
-            x2 <= 0;
-            x3 <= 0;
-        end
-        else
-        begin
-            x3 <= x2;
-            x2 <= x1;
+    // Delay Line
+    always @(posedge clk or posedge rst) begin
+        if(rst) begin
+            x1 <= 0; x2 <= 0; x3 <= 0;
+        end else begin
             x1 <= x_in;
+            x2 <= x1;
+            x3 <= x2;
         end
     end
-
-    /* output sum with Baugh-Wooley bias removed */
-    assign y_out = (m0 + m1 + m2 + m3) - 16'd8192;
-
+    // Accumulation
+    assign y_out = m0 + m1 + m2 + m3;
 endmodule
 
-module Approximate_Multiplier_8X8_bits_2error(A, B, Z_T);
-    input [7:0]A,B;
-    wire [14:0]Z_S;
-    wire [14:0]Z_C;
-    output reg [15:0]Z_T;
-    wire [11:0]S;
-    wire [11:0]C;
-    wire [11:0]X;
-    wire [11:0]Y;
-    wire [11:0]U;
+module Approximate_Multiplier_8X8_bits_2error(
+    input [7:0] A,
+    input [7:0] B,
+    output [15:0] Z_T
+);
+    wire [7:0] pp [7:0];
+    wire [7:0] col [15:0];
+    wire [15:0] S1, C1, S2, C2;
+    wire [16:0] ripple1, ripple2;
 
+    assign ripple1[0] = 1'b0;
+    assign ripple2[0] = 1'b0;
 
-    half_adder HA1(A[0]&B[4], A[1]&B[3], S[0], C[0]);
+    // 1. Partial Product Generation
+    genvar i, j;
+    generate
+        for (i = 0; i < 8; i = i + 1) begin : rows
+            for (j = 0; j < 8; j = j + 1) begin : cols
+                assign pp[i][j] = A[j] & B[i];
+            end
+        end
+    endgenerate
 
-    // 2-error compressors
-    Approximate_4_2_Compressor_with_2_errors ACOE1(A[0]&B[5],A[1]&B[4],A[2]&B[3],A[3]&B[2],S[1],C[1]);
-    Approximate_4_2_Compressor_with_2_errors ACOE2(A[0]&B[6],A[1]&B[5],A[2]&B[4],A[3]&B[3],S[2],C[2]);
+    // 2. Column Alignment
+    generate
+        for (i = 0; i < 16; i = i + 1) begin : columns
+            wire [7:0] temp_col;
+            for (j = 0; j < 8; j = j + 1) begin : bits
+                if (i >= j && (i - j) < 8)
+                    assign temp_col[j] = pp[j][i-j];
+                else
+                    assign temp_col[j] = 1'b0;
+            end
+            assign col[i] = temp_col;
+        end
+    endgenerate
 
-    half_adder HA2(A[4]& B[2], A[5]&B[1], S[3], C[3]);
+    // 3. Reduction with Correct Carry Propagation
+    generate
+        for (i = 0; i < 16; i = i + 1) begin : red
+            if (i < 9) begin : approx_zone
+                Approximate_4_2_Compressor_with_2_errors ACC1 (col[i][0], col[i][1], col[i][2], col[i][3], S1[i], C1[i]);
+                Approximate_4_2_Compressor_with_2_errors ACC2 (col[i][4], col[i][5], col[i][6], col[i][7], S2[i], C2[i]);
+                assign ripple1[i+1] = 1'b0;
+                assign ripple2[i+1] = 1'b0;
+            end else begin : exact_zone
+                Compressor_4_2 EX1 (col[i][0], col[i][1], col[i][2], col[i][3], ripple1[i], ripple1[i+1], C1[i], S1[i]);
+                Compressor_4_2 EX2 (col[i][4], col[i][5], col[i][6], col[i][7], ripple2[i], ripple2[i+1], C2[i], S2[i]);
+            end
+        end
+    endgenerate
 
-    // 2-error compressors
-    Approximate_4_2_Compressor_with_2_errors ACOE3(A[0]&B[7],A[1]&B[6],A[2]&B[5],A[3]&B[4],S[4],C[4]);
-    Approximate_4_2_Compressor_with_2_errors ACOE4(A[4]&B[3],A[5]&B[2],A[6]&B[1],A[7]&B[0],S[5],C[5]);
-
-    // EXACT 4-2 Compressors restored!
-    compressor42_exact CFT1(A[1]&B[7],A[2]&B[6],A[3]&B[5],A[4]&B[4],1'b0,C[6],U[0],S[6]);
-
-    Full_Adder FA1(A[5]&B[3],A[6]&B[2],A[7]&B[1],S[7],C[7]);
-
-    compressor42_exact CFT2(A[2]&B[7],A[3]&B[6],A[4]&B[5],A[5]&B[4],1'b0,C[8],U[1],S[8]);
-
-    half_adder HA3(A[6]& B[3], A[7]&B[2], S[9], C[9]);
-
-    compressor42_exact CFT3(~(A[3]&B[7]),A[4]&B[6],A[5]&B[5],A[6]&B[4],1'b0,C[10],U[2],S[10]);
-
-    half_adder HA4(~(A[4]& B[7]), A[5]&B[6], S[11], C[11]);
-
-    ///////////////////////////////////////////////////////////////////////////////////////////////////
-    half_adder HA5(A[0]& B[2], A[1]&B[1], X[0], Y[0]);
-
-    // 2-error compressors
-    Approximate_4_2_Compressor_with_2_errors ACOE5(A[0]&B[3],A[1]&B[2],A[2]&B[1],A[3]&B[0],X[1], Y[1]);
-    Approximate_4_2_Compressor_with_2_errors ACOE6(S[0],A[2]&B[2],A[3]&B[1],A[4]&B[0],X[2], Y[2]);
-    Approximate_4_2_Compressor_with_2_errors ACOE7(C[0],S[1],A[4]&B[1],A[5]&B[0],X[3], Y[3]);
-    Approximate_4_2_Compressor_with_2_errors ACOE8(C[1],S[2],S[3],A[6]&B[0],X[4], Y[4]);
-    Approximate_4_2_Compressor_with_2_errors ACOE9(C[2],C[3],S[4],S[5],X[5], Y[5]);
-
-    // EXACT 4-2 Compressors restored!
-    compressor42_exact CFT4(C[4], C[5],S[6],S[7],1'b0,Y[6],U[3],X[6]);
-    compressor42_exact CFT5(C[6], C[7],S[8],S[9],1'b0,Y[7],U[4],X[7]);
-    compressor42_exact CFT6(C[8], C[9],S[10],~(A[7]&B[3]),1'b0,Y[8],U[5],X[8]);
-    compressor42_exact CFT7(C[10], S[11], A[6]&B[5],~(A[7]&B[4]),1'b0,Y[9],U[6],X[9]);
-    compressor42_exact CFT8(C[11], ~(A[5]&B[7]), A[6]&B[6],~(A[7]&B[5]),1'b0,Y[10],U[7],X[10]);
-
-    half_adder HA6(~(A[6]& B[7]), ~(A[7]&B[6]), X[11], Y[11]);
-    /////////////////////////////////////////////////////////////////////////////////////////////////////
-
-    assign Z_S[0] = A[0]&B[0];
-    assign Z_S[1] = (A[0]&B[1])^(A[1]&B[0])|(A[0]&B[1])&(A[1]&B[0]);
-    assign Z_S[2] = X[0]^(A[2]&B[0])|X[0]&(A[2]&B[0]);
-    assign Z_S[3] = Y[0]^X[1]|Y[0]&X[1];
-    assign Z_S[4] = Y[1]^X[2]|Y[1]&X[2];
-    assign Z_S[5] = Y[2]^X[3]|Y[2]&X[3];
-    assign Z_S[6] = Y[3]^X[4]|Y[3]&X[4];
-    assign Z_S[7] = Y[4]^X[5]|Y[4]&X[5];
-    assign Z_S[8] = Y[5]^X[6]|Y[5]&X[6];
-    assign Z_S[9] = Y[6]^X[7]|Y[6]&X[7];
-    assign Z_S[10] = Y[7]^X[8]|Y[7]&X[8];
-    assign Z_S[11] = Y[8]^X[9]|Y[8]&X[9];
-    assign Z_S[12] = Y[9]^X[10]|Y[9]&X[10];
-    assign Z_S[13] = Y[10]^X[11]|Y[10]&X[11];
-    assign Z_S[14] = A[7]&B[7]^Y[11];
-
-    assign Z_C[0] = 1'b0;
-    assign Z_C[1] = (A[0]&B[1])&(A[1]&B[0]);
-    assign Z_C[2] = X[0]&(A[2]&B[0]);
-    assign Z_C[3] = Y[0]&X[1];
-    assign Z_C[4] = Y[1]&X[2];
-    assign Z_C[5] = Y[2]&X[3];
-    assign Z_C[6] = Y[3]&X[4];
-    assign Z_C[7] = Y[4]&X[5];
-    assign Z_C[8] = Y[5]&X[6];
-    assign Z_C[9] = Y[6]&X[7];
-    assign Z_C[10] = Y[7]&X[8];
-    assign Z_C[11] = Y[8]&X[9];
-    assign Z_C[12] = Y[9]&X[10];
-    assign Z_C[13] = Y[10]&X[11];
-    assign Z_C[14] = Y[11];
-
-    always@(Z_S, Z_C)
-    begin
-        Z_T = Z_S + Z_C;
-    end
+    // 4. Final Addition - Weighting C by 2^1
+    assign Z_T = S1 + S2 + (C1 << 1) + (C2 << 1);
 
 endmodule
-
 // ----------------------------------------------------------------------------------
 // SUBMODULES
 // ----------------------------------------------------------------------------------
@@ -156,19 +99,8 @@ module Two_input_binary_sorter(In1,In2,Out1,Out2);
 
 endmodule
 
-module half_adder(
-    input a,
-    input b,
-    output sum,
-    output carry
-);
 
-    assign sum = a ^ b;
-    assign carry = a & b;
-
-endmodule
-
-// --- 2-ERROR MODULES ---
+// --- NEWLY ADDED 2-ERROR MODULES ---
 
 module Approximate_4_2_Compressor_with_2_errors(x0,x1,x2,x3,Sum,Carry);
     input x0,x1,x2,x3;
@@ -177,13 +109,8 @@ module Approximate_4_2_Compressor_with_2_errors(x0,x1,x2,x3,Sum,Carry);
     wire A, h1, h2, D;
 
     Four_way_Sorting_Network FSN1(x0,x1,x2,x3,A,h1,h2,D);
-    
-    // Carry path remains exactly the same
-    assign Carry = A & h1; 
-    
-    // THE FIX: We expanded (A ^ h1) into its basic gates: (A & ~h1) | (~A & h1)
-    // This strictly preserves your 2-error math while forcing the tool to use ultra-fast AOI standard cells!
-    assign Sum = (A & ~h1) | (~A & h1) | h2; 
+    assign Carry = A&h1; 
+    assign Sum = (A^h1)|h2;
 
 endmodule
 
@@ -200,36 +127,34 @@ module Four_way_Sorting_Network(In1,In2,In3,In4,Out1,Out2,Out3,Out4);
 endmodule
 
 // ----------------------------------------------------------------------------------
-// EXACT MODULES (Restored from 1-error code for clean standard cell routing)
+// EXACT MODULES (Kept for standard routing)
 // ----------------------------------------------------------------------------------
 
-module compressor42_exact(
-    input x1,x2,x3,x4,
-    input cin,
-    output sum,
-    output carry,
-    output cout
-);
+module Half_Sort(I1,I2,I3,I4,O1,O2,O3,O4);
+    input I1,I2,I3,I4;
+    output O1,O2,O3,O4;
+    wire w[3:0];
 
-    wire s1,c1,s2,c2;
-
-    Full_Adder FA1(x1,x2,x3,s1,c1);
-    Full_Adder FA2(s1,x4,cin,sum,c2);
-
-    assign carry = c1;
-    assign cout = c2;
+    Two_input_binary_sorter  BS1(I1,I2,w[0],w[1]);
+    Two_input_binary_sorter  BS2(I3,I4,w[2],w[3]);
+    Two_input_binary_sorter  BS3(w[0],w[2],O1,O3);
+    Two_input_binary_sorter  BS4(w[1],w[3],O2,O4);
 
 endmodule
 
-module Full_Adder(
-    input a,
-    input b,
-    input cin,
-    output sum,
-    output cout
-);
+module Compressor_4_2(x0,x1,x2,x3,Cin,Cout,Carry,Sum);
+    input x0,x1,x2,x3,Cin;
+    output Carry,Sum,Cout;
+    wire A,B,C,D,s0,h1,h2;
 
-    assign sum = a ^ b ^ cin;
-    assign cout = (a & b) | (b & cin) | (a & cin);
+    Half_Sort HS1(x0,x1,x2,x3,A,B,C,D);
+    assign s0 = (A&(~B))|D;
+    assign Cout = B;
+    assign h1 = C|Cin;
+    assign h2 = C&Cin;
+    assign Carry = (s0 & h1)|h2;
+    assign Sum = s0?((~h1)|h2):(h1&(~h2));
 
 endmodule
+
+
